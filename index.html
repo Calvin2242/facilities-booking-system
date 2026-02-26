@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Booking System</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 font-sans">
+
+    <nav class="bg-blue-900 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">Lab Booking Portal</h1>
+            <div id="auth-status" class="text-sm">Checking session...</div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto py-8 px-4">
+        <section class="mb-10 bg-white p-6 rounded-xl shadow-md">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800">1. Check Availability</h2>
+            <div class="flex flex-wrap gap-4 items-end">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Select Date</label>
+                    <input type="date" id="booking-date" class="mt-1 block w-full border rounded-md p-2 shadow-sm">
+                </div>
+                <button onclick="fetchAvailability()" class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition">
+                    Refresh Schedule
+                </button>
+            </div>
+        </section>
+
+        <section id="grid-container" class="overflow-x-auto bg-white p-4 rounded-xl shadow-md">
+            <p class="text-gray-500 italic text-center">Select a date to view the lab schedule.</p>
+        </section>
+    </main>
+
+    <script>
+        // Initialize Supabase
+        const _supabase = supabase.createClient('YOUR_SUPABASE_URL', 'YOUR_SUPABASE_ANON_KEY');
+
+        async function fetchAvailability() {
+            const date = document.getElementById('booking-date').value;
+            if(!date) return alert("Please select a date first!");
+            
+            // Logic to fetch from Supabase and render the grid goes here
+            console.log("Fetching labs for:", date);
+        }
+    </script>
+</body>
+</html>
