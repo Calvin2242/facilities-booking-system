@@ -63,87 +63,104 @@
     const SUPABASE_URL = 'https://naptcmmrazrvpukrefxe.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_sqns8O_0Wjdo-oW46m83Pw_fulPTNhe';
     
-    let supabase;
+    // Changed name from 'supabase' to 'supabaseClient' to avoid the redeclaration error
+    let supabaseClient;
 
     // --- 2. INITIALIZATION ---
     function init() {
         try {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            console.log("Supabase initialized successfully.");
+            // Use the library's createClient method
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            console.log("Supabase Client initialized.");
             fetchPending();
             fetchLabs();
         } catch (err) {
-            console.error("Critical Initialization Error:", err);
-            alert("Failed to connect to the database. Check your internet or API keys.");
+            console.error("Initialization Error:", err);
         }
     }
 
-    // --- 3. EXPLICITLY DEFINE FUNCTIONS ON WINDOW ---
-    // This prevents the "Not Defined" error on GitHub Pages
+    // --- 3. GLOBAL FUNCTIONS ---
+    // Attaching directly to 'window' so HTML onclick can always find them
+    
     window.addNewLab = async function() {
-        const nameField = document.getElementById('new-lab-name');
-        const typeField = document.getElementById('new-lab-type');
-        const name = nameField.value.trim();
-        const type = typeField.value;
+    const nameField = document.getElementById('new-lab-name');
+    const typeField = document.getElementById('new-lab-type');
+    
+    const name = nameField.value.trim();
+    // Fallback to 'Individu' if no selection is detected
+    const type = typeField.value || 'Individu'; 
 
-        if (!name) return alert("Please enter a lab name!");
+    if (!name) return alert("Please enter a lab name!");
 
-        const { error } = await supabase.from('labs').insert([{ 
-            name: name, 
-            type: type, 
-            is_active: true 
-        }]);
+    const { error } = await supabaseClient.from('labs').insert([{ 
+        name: name, 
+        type: type, 
+        is_active: true 
+    }]);
 
+    if (error) {
+        alert('Error: ' + error.message);
+    } else {
+        nameField.value = '';
+        fetchLabs();
+    }
+};
+
+    window.updateStatus = async function(id, newStatus) {
+        console.log('updateStatus called', { id, newStatus, supabaseClient });
+        if (!supabaseClient) {
+            alert('Supabase client not initialized');
+            return;
+        }
+        const { data, error } = await supabaseClient
+            .from('bookings')
+            .update({ status: newStatus })
+            .eq('id', id);
         if (error) {
-            console.error('Insert failed', error);
-            alert('Failed to add lab: ' + error.message);
+            console.error('updateStatus error', error);
+            alert("Error updating status: " + error.message);
         } else {
-            nameField.value = '';
-            fetchLabs();
+            console.log('updateStatus success', data);
+            fetchPending();
         }
     };
 
-    window.updateStatus = async function(id, newStatus) {
-        const { error } = await supabase.from('bookings').update({ status: newStatus }).eq('id', id);
-        if (error) alert("Error: " + error.message);
-        else fetchPending();
-    };
-
     window.toggleLab = async function(id, currentStatus) {
-        const { error } = await supabase.from('labs').update({ is_active: !currentStatus }).eq('id', id);
+        const { error } = await supabaseClient.from('labs').update({ is_active: !currentStatus }).eq('id', id);
         if (error) alert(error.message);
         else fetchLabs();
     };
 
     window.deleteLab = async function(id) {
-        if (!confirm("Are you sure? This will remove the facility from the system permanently.")) return;
-        const { error } = await supabase.from('labs').delete().eq('id', id);
-        if (error) alert("Could not delete: " + error.message);
+        if (!confirm("Delete this facility permanently?")) return;
+        const { error } = await supabaseClient.from('labs').delete().eq('id', id);
+        if (error) alert("Error: " + error.message);
         else fetchLabs();
     };
 
     async function fetchPending() {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('bookings')
             .select('*, labs(name)')
             .eq('status', 'pending')
             .order('created_at', { ascending: true });
 
+        console.log('fetchPending result', { data, error });
         const container = document.getElementById('pending-list');
-        if (error) {
-            container.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+        if (error || !data) {
+            container.innerHTML = `<p class="text-red-500">Error loading data. See console for details.</p>`;
             return;
         }
 
-        if (!data || data.length === 0) {
-            container.innerHTML = '<p class="text-gray-400 italic">No pending requests at the moment.</p>';
+        if (data.length === 0) {
+            container.innerHTML = '<p class="text-gray-400 italic">No pending requests.</p>';
             return;
         }
 
         container.innerHTML = data.map(req => `
             <div class="border p-4 rounded-lg bg-gray-50 flex justify-between items-center shadow-sm">
                 <div>
-                    <div class="font-bold text-blue-900">${req.labs?.name || 'Lab ID: ' + req.lab_id}</div>
+                    <div class="font-bold text-blue-900">${req.labs?.name || 'Lab'}</div>
                     <div class="text-sm text-gray-600">${req.booking_date} | ${req.time_slot}</div>
                     <div class="text-xs text-gray-500 mt-1 uppercase font-bold">User: ${req.user_name}</div>
                 </div>
@@ -156,9 +173,9 @@
     }
 
     async function fetchLabs() {
-        const { data, error } = await supabase.from('labs').select('*').order('name');
+        const { data, error } = await supabaseClient.from('labs').select('*').order('name');
         const container = document.getElementById('labs-list');
-        if (error) return;
+        if (error || !data) return;
 
         container.innerHTML = data.map(lab => `
             <div class="flex items-center justify-between p-3 border rounded shadow-sm bg-white">
@@ -176,7 +193,7 @@
         `).join('');
     }
 
-    // Run the init function when the page is ready
+    // Start everything when the window is loaded
     window.onload = init;
 </script>
 </body>

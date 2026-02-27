@@ -17,6 +17,7 @@
         <div class="container mx-auto flex justify-between items-center">
             <h1 class="text-xl font-bold tracking-tight">Counseling Lab Booking</h1>
             <div id="auth-status" class="text-sm bg-blue-800 px-3 py-1 rounded">Connecting...</div>
+            <button onclick="goToAdmin()" class="bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">View Admin</button>
         </div>
     </nav>
 
@@ -89,7 +90,7 @@
         // --- 1. CONFIGURATION ---
         const SUPABASE_URL = 'https://naptcmmrazrvpukrefxe.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_sqns8O_0Wjdo-oW46m83Pw_fulPTNhe';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         const SLOTS = ["0800-0900", "0900-1000", "1000-1100", "1100-1200", "1200-1300", "1300-1400", "1400-1500", "1500-1600", "1600-1700", "1700-1800"];
 
@@ -105,8 +106,8 @@
                 // Fetch ALL labs (including inactive ones for maintenance display) 
                 // and bookings for the chosen date
                 const [labsRes, bookingsRes] = await Promise.all([
-                    supabase.from('labs').select('*').order('name'),
-                    supabase.from('bookings').select('*').eq('booking_date', date)
+                    supabaseClient.from('labs').select('*').order('name'),
+                    supabaseClient.from('bookings').select('*').eq('booking_date', date)
                 ]);
 
                 if (labsRes.error) throw labsRes.error;
@@ -187,7 +188,7 @@
             const date = document.getElementById('booking-date').value;
             const time_slot = document.getElementById('modal-details-text').innerText.split(' | ')[1];
             
-            const { error } = await supabase.from('bookings').insert([{
+            const { error } = await supabaseClient.from('bookings').insert([{
                 lab_id: lab_id,
                 booking_date: date,
                 time_slot: time_slot,
@@ -204,6 +205,11 @@
                 fetchAvailability();
             }
         };
+
+        // --- 5. ADMIN PAGE NAVIGATION --- TEMPORARY FOR DEV AND TESTING ONLY
+        function goToAdmin() {
+            window.location.href = 'admin.html';
+        }
     </script>
 </body>
 </html>
