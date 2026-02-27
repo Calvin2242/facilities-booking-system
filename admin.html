@@ -34,105 +34,150 @@
                 <h2 class="text-xl font-bold mb-4 flex items-center">
                     <span class="mr-2">🔬</span> Lab Management
                 </h2>
-                <div id="labs-list" class="space-y-3 mb-4">
+                
+                <div class="bg-gray-50 p-4 rounded-lg border mb-6">
+                    <h3 class="font-bold text-sm mb-3 text-gray-600 uppercase">Register New Facility</h3>
+                    <div class="space-y-3">
+                        <input type="text" id="new-lab-name" placeholder="Name (e.g. Makmal Latihan 1A)" class="w-full border p-2 rounded text-sm">
+                        <select id="new-lab-type" class="w-full border p-2 rounded text-sm bg-white">
+                            <option value="Individu">Individu (1-on-1)</option>
+                            <option value="Kelompok">Kelompok (Group)</option>
+                            <option value="Tutorial">Tutorial</option>
+                        </select>
+                        <button onclick="addNewLab()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded text-sm transition">
+                            Add Facility
+                        </button>
                     </div>
-                <hr class="my-4">
-                <h3 class="font-bold text-sm mb-2 text-gray-600">Add New Lab</h3>
-                <div class="flex gap-2">
-                    <input type="text" id="new-lab-name" placeholder="Lab Name" class="border p-2 rounded text-sm flex-grow">
-                    <button onclick="addNewLab()" class="bg-green-600 text-white px-3 py-1 rounded text-sm">+</button>
                 </div>
+
+                <h3 class="font-bold text-sm mb-2 text-gray-600 uppercase">Existing Facilities</h3>
+                <div id="labs-list" class="space-y-3">
+                    </div>
             </div>
         </section>
 
     </main>
 
     <script>
-        const SUPABASE_URL = 'https://naptcmmrazrvpukrefxe.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_sqns8O_0Wjdo-oW46m83Pw_fulPTNhe';
-        // note: anon key can only perform actions allowed by your row-level security policies.
-        // if you haven't added an "allow insert" policy for "labs", anonymous clients
-        // won't be able to create rows. The UI will show a helpful error above.
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // --- 1. CONFIGURATION ---
+    const SUPABASE_URL = 'https://naptcmmrazrvpukrefxe.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_sqns8O_0Wjdo-oW46m83Pw_fulPTNhe';
+    
+    let supabase;
 
-        async function initAdmin() {
+    // --- 2. INITIALIZATION ---
+    function init() {
+        try {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            console.log("Supabase initialized successfully.");
             fetchPending();
             fetchLabs();
+        } catch (err) {
+            console.error("Critical Initialization Error:", err);
+            alert("Failed to connect to the database. Check your internet or API keys.");
+        }
+    }
+
+    // --- 3. EXPLICITLY DEFINE FUNCTIONS ON WINDOW ---
+    // This prevents the "Not Defined" error on GitHub Pages
+    window.addNewLab = async function() {
+        const nameField = document.getElementById('new-lab-name');
+        const typeField = document.getElementById('new-lab-type');
+        const name = nameField.value.trim();
+        const type = typeField.value;
+
+        if (!name) return alert("Please enter a lab name!");
+
+        const { error } = await supabase.from('labs').insert([{ 
+            name: name, 
+            type: type, 
+            is_active: true 
+        }]);
+
+        if (error) {
+            console.error('Insert failed', error);
+            alert('Failed to add lab: ' + error.message);
+        } else {
+            nameField.value = '';
+            fetchLabs();
+        }
+    };
+
+    window.updateStatus = async function(id, newStatus) {
+        const { error } = await supabase.from('bookings').update({ status: newStatus }).eq('id', id);
+        if (error) alert("Error: " + error.message);
+        else fetchPending();
+    };
+
+    window.toggleLab = async function(id, currentStatus) {
+        const { error } = await supabase.from('labs').update({ is_active: !currentStatus }).eq('id', id);
+        if (error) alert(error.message);
+        else fetchLabs();
+    };
+
+    window.deleteLab = async function(id) {
+        if (!confirm("Are you sure? This will remove the facility from the system permanently.")) return;
+        const { error } = await supabase.from('labs').delete().eq('id', id);
+        if (error) alert("Could not delete: " + error.message);
+        else fetchLabs();
+    };
+
+    async function fetchPending() {
+        const { data, error } = await supabase
+            .from('bookings')
+            .select('*, labs(name)')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: true });
+
+        const container = document.getElementById('pending-list');
+        if (error) {
+            container.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+            return;
         }
 
-        // --- REQUEST MANAGEMENT ---
-        async function fetchPending() {
-            const { data, error } = await supabase
-                .from('bookings')
-                .select('*, labs(name)')
-                .eq('status', 'pending')
-                .order('created_at', { ascending: true });
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p class="text-gray-400 italic">No pending requests at the moment.</p>';
+            return;
+        }
 
-            const container = document.getElementById('pending-list');
-            if (data.length === 0) {
-                container.innerHTML = '<p class="text-gray-400">All clear! No pending requests.</p>';
-                return;
-            }
-
-            container.innerHTML = data.map(req => `
-                <div class="border p-4 rounded-lg bg-gray-50 flex justify-between items-center">
-                    <div>
-                        <div class="font-bold text-blue-900">${req.labs.name}</div>
-                        <div class="text-sm text-gray-600">${req.booking_date} | ${req.time_slot}</div>
-                        <div class="text-xs text-gray-500 mt-1">Requested by: ${req.user_name}</div>
-                        <div class="text-xs italic mt-1 font-medium">"${req.purpose}"</div>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="updateStatus('${req.id}', 'approved')" class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700">Approve</button>
-                        <button onclick="updateStatus('${req.id}', 'rejected')" class="bg-red-600 text-white px-3 py-1 rounded text-xs hover:bg-red-700">Reject</button>
-                    </div>
+        container.innerHTML = data.map(req => `
+            <div class="border p-4 rounded-lg bg-gray-50 flex justify-between items-center shadow-sm">
+                <div>
+                    <div class="font-bold text-blue-900">${req.labs?.name || 'Lab ID: ' + req.lab_id}</div>
+                    <div class="text-sm text-gray-600">${req.booking_date} | ${req.time_slot}</div>
+                    <div class="text-xs text-gray-500 mt-1 uppercase font-bold">User: ${req.user_name}</div>
                 </div>
-            `).join('');
-        }
+                <div class="flex flex-col gap-2">
+                    <button onclick="updateStatus('${req.id}', 'approved')" class="bg-green-600 text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-green-700">Approve</button>
+                    <button onclick="updateStatus('${req.id}', 'rejected')" class="bg-red-600 text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-red-700">Reject</button>
+                </div>
+            </div>
+        `).join('');
+    }
 
-        async function updateStatus(id, newStatus) {
-            const { error } = await supabase.from('bookings').update({ status: newStatus }).eq('id', id);
-            if (!error) fetchPending();
-        }
+    async function fetchLabs() {
+        const { data, error } = await supabase.from('labs').select('*').order('name');
+        const container = document.getElementById('labs-list');
+        if (error) return;
 
-        // --- LAB MANAGEMENT ---
-        async function fetchLabs() {
-            const { data } = await supabase.from('labs').select('*').order('name');
-            const container = document.getElementById('labs-list');
-            
-            container.innerHTML = data.map(lab => `
-                <div class="flex items-center justify-between p-2 border rounded ${lab.is_active ? 'bg-white' : 'bg-red-50 opacity-60'}">
-                    <span class="text-sm font-medium">${lab.name}</span>
-                    <button onclick="toggleLab('${lab.id}', ${lab.is_active})" 
-                        class="text-[10px] px-2 py-1 rounded border ${lab.is_active ? 'bg-gray-100 text-red-600 border-red-200' : 'bg-green-100 text-green-600 border-green-200'}">
-                        ${lab.is_active ? 'Decommission' : 'Restore'}
+        container.innerHTML = data.map(lab => `
+            <div class="flex items-center justify-between p-3 border rounded shadow-sm bg-white">
+                <div>
+                    <div class="text-sm font-bold">${lab.name}</div>
+                    <div class="text-[10px] text-blue-600 font-bold uppercase">${lab.type || 'Individu'}</div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="toggleLab('${lab.id}', ${lab.is_active})" class="text-[9px] px-2 py-1 rounded border font-bold ${lab.is_active ? 'bg-orange-50 text-orange-600' : 'bg-green-50 text-green-600'}">
+                        ${lab.is_active ? 'MAINTENANCE' : 'RESTORE'}
                     </button>
+                    <button onclick="deleteLab('${lab.id}')" class="text-[9px] px-2 py-1 rounded border bg-red-50 text-red-600 font-bold">DELETE</button>
                 </div>
-            `).join('');
-        }
+            </div>
+        `).join('');
+    }
 
-        async function toggleLab(id, currentStatus) {
-            await supabase.from('labs').update({ is_active: !currentStatus }).eq('id', id);
-            fetchLabs();
-        }
-
-        async function addNewLab() {
-            const name = document.getElementById('new-lab-name').value;
-            if (!name) return;
-
-            // insert and show any errors so we can diagnose permission issues
-            const { data, error } = await supabase.from('labs').insert([{ name: name }]);
-            if (error) {
-                console.error('insert failed', error);
-                alert('Failed to add lab: ' + error.message);
-                return;
-            }
-
-            document.getElementById('new-lab-name').value = '';
-            fetchLabs();
-        }
-
-        initAdmin();
-    </script>
+    // Run the init function when the page is ready
+    window.onload = init;
+</script>
 </body>
 </html>
