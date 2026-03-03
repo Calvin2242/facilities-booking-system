@@ -35,7 +35,7 @@
 
         <section id="search-section" class="content-section">
             <div class="card">
-                <h2 class="text-xl font-bold mb-4">Availability Grid</h2>
+                <h2 class="text-xl font-bold mb-4">Availability</h2>
                 <div class="filter-group">
                     <div class="flex-1"><label class="text-[10px] font-bold text-gray-500 uppercase">Select Date</label><input type="date" id="booking-date" onchange="fetchAvailability()"></div>
                     <div class="flex-1"><label class="text-[10px] font-bold text-gray-500 uppercase">Lab</label><select id="lab-filter" onchange="fetchAvailability()"><option value="all">All Labs</option></select></div>
@@ -122,7 +122,7 @@
         async function fetchAvailability() {
             const date = document.getElementById('booking-date').value;
             const labId = document.getElementById('lab-filter').value;
-            if(!date) return;
+            if(!date) return alert('Please select a date');
             let query = supabaseClient.from('labs').select('*').order('name');
             if(labId !== 'all') query = query.eq('id', labId);
             const [lRes, bRes] = await Promise.all([query, supabaseClient.from('bookings').select('*').eq('booking_date', date)]);
