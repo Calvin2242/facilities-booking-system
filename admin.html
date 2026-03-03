@@ -17,6 +17,7 @@
                 <button onclick="switchView('users-section')" class="btn btn-admin text-xs">Users</button>
                 <button onclick="switchView('labs-section')" class="btn btn-admin text-xs">Labs</button>
                 <button onclick="window.location.href='index.html'" class="btn btn-primary text-xs">Home</button>
+                <button onclick="logoutUser()" class="btn btn-danger text-xs">Logout</button>
             </div>
         </div>
     </nav>
@@ -160,6 +161,7 @@
         async function delUser(id) { if(confirm('Del?')){ await supabaseClient.from('users').delete().eq('id', id); fetchUsers(); } }
         function clearFilter(t) { document.getElementById(`filter-${t}-date`).value = ''; document.getElementById(`filter-${t}-lab`).value = 'all'; renderFiltered(); }
         function switchView(id) { document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+        function logoutUser() { localStorage.clear(); window.location.reload(); }
     </script>
 </body>
 </html>
