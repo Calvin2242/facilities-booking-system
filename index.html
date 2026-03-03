@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lab Booking System</title>
+    <title>Lab Booking System | Glass Edition</title>
     <link rel="stylesheet" href="mystyle.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -24,43 +25,48 @@
 
     <main class="container mx-auto p-4 max-w-5xl">
         <section id="login-section" class="content-section active">
-            <div class="card max-w-md mx-auto mt-10 border-t-4 border-blue-600">
-                <h2 class="text-2xl font-bold mb-6 text-center text-blue-900">Sign In</h2>
+            <div class="card max-w-md mx-auto mt-10">
+                <h2 class="text-2xl font-bold mb-6 text-center">Login</h2>
                 <div class="space-y-4">
                     <input type="email" id="login-email" placeholder="Email Address">
-                    <input type="password" id="login-password" placeholder="Password">
-                    <button id="login-btn" onclick="loginUser()" class="btn btn-primary w-full shadow-md">Sign In</button>
+                    <input type="password" id="login-pw" placeholder="Password">
+                    <button onclick="loginUser()" class="btn btn-primary w-full">Sign In</button>
                 </div>
             </div>
         </section>
 
         <section id="search-section" class="content-section">
-            <div class="card border-t-4 border-blue-600">
-                <h2 class="text-xl font-bold mb-4 text-gray-800">1. Select Date & Lab</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="card">
+                <h2 class="text-xl font-bold mb-4">Find Available Slots</h2>
+                <div class="filter-group">
                     <div>
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Date</label>
-                        <input type="date" id="booking-date">
+                        <label>Date</label>
+                        <input type="date" id="booking-date" onchange="fetchAvailability()">
                     </div>
                     <div>
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Lab Facility</label>
-                        <select id="lab-filter">
+                        <label>Lab Facility</label>
+                        <select id="lab-select" onchange="fetchAvailability()">
                             <option value="all">All Labs</option>
                         </select>
                     </div>
-                    <div class="flex items-end">
-                        <button onclick="fetchAvailability()" class="btn btn-primary w-full">Check Availability</button>
-                    </div>
+                    <button onclick="fetchAvailability()" class="btn btn-primary">Check Availability</button>
                 </div>
-                <div id="grid-container" class="table-responsive">
-                    <p class="p-10 text-center text-gray-400 italic">Select a date to begin.</p>
+
+                <div class="table-responsive mt-6">
+                    <table class="w-full">
+                        <thead id="grid-header"></thead>
+                        <tbody id="grid-body"></tbody>
+                    </table>
+                    <div id="grid-placeholder" class="text-center p-10 opacity-50">
+                        Select a date to begin.
+                    </div>
                 </div>
             </div>
         </section>
 
         <section id="my-bookings-section" class="content-section">
-            <div class="card border-t-4 border-green-500">
-                <h2 class="text-xl font-bold mb-4 text-gray-800">My Booking History</h2>
+            <div class="card">
+                <h2 class="text-xl font-bold mb-4">My Booking History</h2>
                 <div class="table-responsive">
                     <table>
                         <thead>
@@ -79,22 +85,20 @@
         </section>
     </main>
 
-    <div id="booking-modal" class="hidden-ui fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
-        <div class="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-            <div class="p-6 border-b">
-                <h3 class="text-xl font-bold text-blue-900">Request This Slot</h3>
+    <div id="booking-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center z-[200]">
+        <div class="card w-full max-w-md mx-4">
+            <h2 class="text-xl font-bold mb-2">Confirm Booking</h2>
+            <p id="modal-details-text" class="text-sm text-slate-600 mb-4 font-mono bg-slate-100 p-2 rounded"></p>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Purpose / Subject</label>
+                    <input type="text" id="purpose" placeholder="e.g. Database Workshop">
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="submitBooking()" class="btn btn-primary flex-1">Confirm Request</button>
+                    <button onclick="closeModal()" class="btn bg-slate-200 text-slate-700 flex-1">Cancel</button>
+                </div>
             </div>
-            <form id="booking-form" class="p-6 space-y-4">
-                <input type="hidden" id="modal-lab-id">
-                <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                    <p id="modal-details-text" class="text-sm font-bold text-blue-800"></p>
-                </div>
-                <textarea id="purpose" required class="min-h-[100px]" placeholder="Briefly state purpose..."></textarea>
-                <div class="flex gap-3 pt-2">
-                    <button type="button" onclick="closeModal()" class="btn bg-gray-100 flex-1">Cancel</button>
-                    <button type="submit" class="btn btn-primary flex-1">Submit Request</button>
-                </div>
-            </form>
         </div>
     </div>
 
@@ -102,15 +106,53 @@
         const SUPABASE_URL = 'https://naptcmmrazrvpukrefxe.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_sqns8O_0Wjdo-oW46m83Pw_fulPTNhe';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         const SLOTS = ["0800-0900", "0900-1000", "1000-1100", "1100-1200", "1200-1300", "1300-1400", "1400-1500", "1500-1600", "1600-1700", "1700-1800"];
+        let currentBookingData = null;
 
         window.onload = () => {
             const user = JSON.parse(localStorage.getItem('currentUser'));
-            if (user) {
-                showInterface(user);
-                populateLabFilter();
-            }
+            if (user) setupUI(user);
+            fetchLabDropdown();
         };
+
+        async function fetchLabDropdown() {
+            const { data } = await supabaseClient.from('labs').select('*').order('name');
+            const select = document.getElementById('lab-select');
+            data.forEach(l => {
+                select.innerHTML += `<option value="${l.id}">${l.name}</option>`;
+            });
+        }
+
+        async function loginUser() {
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-pw').value;
+            
+            const msgUint8 = new TextEncoder().encode(pass);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+            const hashed = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+            const { data, error } = await supabaseClient.from('users').select('*').eq('email', email).eq('password', hashed).single();
+
+            if (data) {
+                localStorage.setItem('currentUser', JSON.stringify(data));
+                setupUI(data);
+                switchView('search-section');
+            } else {
+                alert("Invalid credentials");
+            }
+        }
+
+        function setupUI(user) {
+            document.getElementById('login-section').classList.remove('active');
+            document.getElementById('nav-controls').classList.remove('hidden-ui');
+            if (user.is_admin) document.getElementById('admin-portal-btn').classList.remove('hidden-ui');
+        }
+
+        function logoutUser() {
+            localStorage.clear();
+            window.location.reload();
+        }
 
         function switchView(id) {
             document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
@@ -118,141 +160,89 @@
             if (id === 'my-bookings-section') fetchUserBookings();
         }
 
-        async function populateLabFilter() {
-            const select = document.getElementById('lab-filter');
-            select.innerHTML = '<option value="all">All Labs</option>';
-            const { data } = await supabaseClient.from('labs').select('id, name').order('name');
-            if (data) data.forEach(lab => {
-                const opt = document.createElement('option');
-                opt.value = lab.id; opt.textContent = lab.name; select.appendChild(opt);
-            });
-        }
-
-        async function hashPassword(password) {
-            const msgUint8 = new TextEncoder().encode(password);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-
-        async function loginUser() {
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            const btn = document.getElementById('login-btn');
-            if (!email || !password) return alert("Fill credentials.");
-            
-            btn.innerText = "Verifying...";
-            const hashed = await hashPassword(password);
-            const { data, error } = await supabaseClient.from('users').select('*').eq('email', email).eq('password', hashed).single();
-
-            if (error || !data) {
-                alert("Login failed.");
-                btn.innerText = "Sign In";
-            } else {
-                localStorage.setItem('currentUser', JSON.stringify(data));
-                showInterface(data);
-                populateLabFilter();
-            }
-        }
-
-        function showInterface(user) {
-            document.getElementById('login-section').classList.remove('active');
-            document.getElementById('nav-controls').classList.remove('hidden-ui');
-            if (user.is_admin) document.getElementById('admin-portal-btn').classList.remove('hidden-ui');
-            switchView('search-section');
-        }
-
-        function logoutUser() {
-            localStorage.removeItem('currentUser');
-            window.location.reload();
-        }
-
         async function fetchAvailability() {
             const date = document.getElementById('booking-date').value;
-            const filterId = document.getElementById('lab-filter').value;
-            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-            if (!date) return alert('Select date!');
-            
-            const container = document.getElementById('grid-container');
-            container.innerHTML = '<p class="p-10 text-center animate-pulse">Checking records...</p>';
+            const labFilter = document.getElementById('lab-select').value;
+            if (!date) return;
 
-            let labsQuery = supabaseClient.from('labs').select('*').order('name');
-            if (filterId !== 'all') labsQuery = labsQuery.eq('id', filterId);
+            document.getElementById('grid-placeholder').classList.add('hidden');
             
-            const [labsRes, bookingsRes] = await Promise.all([
-                labsQuery, 
-                supabaseClient.from('bookings').select('*').eq('booking_date', date)
-            ]);
-            
-            const labs = labsRes.data;
-            const bookings = bookingsRes.data || [];
+            const labsQuery = supabaseClient.from('labs').select('*').order('name');
+            if (labFilter !== 'all') labsQuery.eq('id', labFilter);
+            const { data: labs } = await labsQuery;
 
-            let html = `<table><thead><tr><th>Slot</th>`;
-            labs.forEach(lab => html += `<th class="text-center">${lab.name}</th>`);
-            html += `</tr></thead><tbody>`;
+            const { data: bookings } = await supabaseClient.from('bookings').select('*').eq('booking_date', date);
 
+            // Render Header
+            let headerHtml = `<tr><th>Slot</th>`;
+            labs.forEach(l => headerHtml += `<th class="text-center">${l.name}</th>`);
+            headerHtml += `</tr>`;
+            document.getElementById('grid-header').innerHTML = headerHtml;
+
+            // Render Body
+            const user = JSON.parse(localStorage.getItem('currentUser'));
+            let bodyHtml = "";
             SLOTS.forEach(slot => {
-                html += `<tr><td class="font-bold">${slot}</td>`;
+                bodyHtml += `<tr><td data-label="Time Slot" class="font-bold">${slot}</td>`;
                 labs.forEach(lab => {
                     const b = bookings.find(i => i.lab_id === lab.id && i.time_slot === slot && i.status !== 'rejected');
-                    
+                    let content = "";
                     if (b) {
-                        const isMine = currentUser && b.user_name === currentUser.name;
+                        const isMine = user && b.user_name === user.name;
                         const isAppr = b.status === 'approved';
-                        
-                        let label, badgeClass;
-                        if (isAppr) {
-                            label = isMine ? "Confirmed" : "Occupied";
-                            badgeClass = isMine ? "status-confirmed" : "status-occupied";
-                        } else {
-                            label = "Pending";
-                            badgeClass = "status-pending";
-                        }
-
-                        html += `<td class="text-center"><span class="badge ${badgeClass} px-2 py-1 rounded-md">${label}</span></td>`;
+                        const badge = isAppr ? (isMine ? "status-confirmed" : "status-occupied") : "status-pending";
+                        const text = isAppr ? (isMine ? "Confirmed" : "Occupied") : "Pending";
+                        content = `<span class="badge ${badge}">${text}</span>`;
                     } else {
-                        html += `<td class="text-center"><button onclick="openModal('${lab.id}', '${lab.name}', '${slot}')" class="btn-primary text-[10px] px-2 py-1 rounded">Book</button></td>`;
+                        content = `<button onclick="openModal('${lab.id}', '${lab.name}', '${slot}')" class="btn btn-primary text-[10px] px-3 py-1">Book</button>`;
                     }
+                    bodyHtml += `<td data-label="${lab.name}" class="text-center">${content}</td>`;
                 });
-                html += `</tr>`;
+                bodyHtml += `</tr>`;
             });
-            container.innerHTML = html + `</tbody></table>`;
+            document.getElementById('grid-body').innerHTML = bodyHtml;
         }
 
-        function openModal(id, name, slot) {
-            document.getElementById('modal-lab-id').value = id;
-            document.getElementById('modal-details-text').innerText = `${name} | ${slot}`;
-            document.getElementById('booking-modal').classList.remove('hidden-ui');
+        function openModal(labId, labName, slot) {
+            currentBookingData = { labId, slot };
+            document.getElementById('modal-details-text').innerText = `${labName} | ${slot}`;
+            document.getElementById('booking-modal').classList.remove('hidden');
         }
 
         function closeModal() {
-            document.getElementById('booking-modal').classList.add('hidden-ui');
+            document.getElementById('booking-modal').classList.add('hidden');
         }
 
-        document.getElementById('booking-form').onsubmit = async (e) => {
-            e.preventDefault();
+        async function submitBooking() {
             const user = JSON.parse(localStorage.getItem('currentUser'));
-            await supabaseClient.from('bookings').insert([{
-                lab_id: document.getElementById('modal-lab-id').value,
+            const { error } = await supabaseClient.from('bookings').insert([{
+                lab_id: currentBookingData.labId,
                 booking_date: document.getElementById('booking-date').value,
-                time_slot: document.getElementById('modal-details-text').innerText.split(' | ')[1],
-                user_name: user.name, status: 'pending', purpose: document.getElementById('purpose').value
+                time_slot: currentBookingData.slot,
+                user_name: user.name,
+                purpose: document.getElementById('purpose').value,
+                status: 'pending'
             }]);
-            closeModal(); fetchAvailability();
-        };
+            if (!error) {
+                closeModal();
+                fetchAvailability();
+            }
+        }
 
         async function fetchUserBookings() {
             const user = JSON.parse(localStorage.getItem('currentUser'));
             const { data } = await supabaseClient.from('bookings').select('*, labs(name)').eq('user_name', user.name).order('booking_date', {ascending: false});
             document.getElementById('user-bookings-list').innerHTML = data.map(b => `
                 <tr>
-                    <td>${b.booking_date}</td>
-                    <td>${b.labs?.name}</td>
-                    <td>${b.time_slot}</td>
-                    <td><span class="badge ${b.status === 'approved' ? 'status-confirmed' : 'status-pending'} px-2 py-1 rounded">${b.status}</span></td>
-                    <td class="text-right">${b.status === 'pending' ? `<button onclick="cancelBooking('${b.id}')" class="text-red-500 font-bold">Cancel</button>` : '-'}</td>
+                    <td data-label="Date">${b.booking_date}</td>
+                    <td data-label="Lab">${b.labs?.name}</td>
+                    <td data-label="Time">${b.time_slot}</td>
+                    <td data-label="Status"><span class="badge ${b.status === 'approved' ? 'status-confirmed' : 'status-pending'}">${b.status}</span></td>
+                    <td data-label="Action" class="text-right">
+                        ${b.status === 'pending' ? `<button onclick="cancelBooking('${b.id}')" class="text-red-500 font-bold">Cancel</button>` : '-'}
+                    </td>
                 </tr>
-            `).join('');
+            `).join('') || '<tr><td colspan="5" class="text-center p-8 opacity-50">No bookings found</td></tr>';
         }
 
         async function cancelBooking(id) {
