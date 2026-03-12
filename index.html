@@ -35,13 +35,29 @@
 
         <section id="search-section" class="content-section">
             <div class="card">
-                <h2 class="text-xl font-bold mb-4">Availability</h2>
-                <div class="filter-group">
-                    <div class="flex-1"><label class="text-[10px] font-bold text-gray-500 uppercase">Select Date</label><input type="date" id="booking-date" onchange="fetchAvailability()"></div>
-                    <div class="flex-1"><label class="text-[10px] font-bold text-gray-500 uppercase">Lab</label><select id="lab-filter" onchange="fetchAvailability()"><option value="all">All Labs</option></select></div>
-                    <button onclick="fetchAvailability()" class="btn btn-primary">Check Availability</button>
+                <h2 class="section-title">📅 Flexible Lab Booking</h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">1. Select Date</label>
+                        <input type="date" id="booking-date" class="mt-2" onchange="refreshBookingView()">
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">2. Select Time Slots (You can pick multiple)</label>
+                        <div id="slot-selection-grid" class="slot-grid mt-2">
+                            </div>
+                    </div>
+
+                    <div class="border-t border-slate-100 pt-6">
+                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-4">3. Available Labs for Selected Period</label>
+                        <div id="available-labs-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div class="col-span-full text-center p-12 opacity-50 border-2 border-dashed border-slate-200 rounded-2xl">
+                                Select a date and at least one time slot.
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div id="grid-container" class="table-responsive"></div>
             </div>
         </section>
 
@@ -101,6 +117,7 @@
         }
 
         function showInterface(user) {
+            // Hide login, show nav and main content
             document.getElementById('login-section').classList.remove('active');
             document.getElementById('nav-controls').classList.remove('hidden-ui');
             if (user.is_admin) document.getElementById('admin-portal-btn').classList.remove('hidden-ui');
@@ -108,18 +125,186 @@
         }
 
         function switchView(id) {
+            // Hide all sections, show the selected one
             document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             if (id === 'my-bookings-section') fetchUserBookings();
         }
+        
+        // Function to reset and show time slots when date changes
+        async function updateTimeSlots() {
+            const select = document.getElementById('time-slot-select');
+            select.innerHTML = '<option value="">-- Choose Time --</option>';
+            
+            SLOTS.forEach(slot => {
+                select.innerHTML += `<option value="${slot}">${slot}</option>`;
+            });
+            
+            document.getElementById('available-labs-container').innerHTML = 
+                `<div class="col-span-full text-center p-12 opacity-50">Now choose a time slot...</div>`;
+        }
 
+        let selectedSlots = [];
+
+        // Initialize or Reset the View
+        function refreshBookingView() {
+            selectedSlots = [];
+            renderSlotGrid();
+            renderAvailableLabs();
+        }
+
+        function renderSlotGrid() {
+            const grid = document.getElementById('slot-selection-grid');
+            grid.innerHTML = SLOTS.map(slot => `
+                <div class="slot-pill" id="pill-${slot}" onclick="toggleSlot('${slot}')">
+                    ${slot}
+                </div>
+            `).join('');
+        }
+
+        function toggleSlot(slot) {
+            const index = selectedSlots.indexOf(slot);
+            if (index > -1) {
+                selectedSlots.splice(index, 1);
+                document.getElementById(`pill-${slot}`).classList.remove('selected');
+            } else {
+                selectedSlots.push(slot);
+                document.getElementById(`pill-${slot}`).classList.add('selected');
+            }
+            renderAvailableLabs();
+        }
+
+        async function renderAvailableLabs() {
+            const date = document.getElementById('booking-date').value;
+            const container = document.getElementById('available-labs-container');
+
+            if (!date || selectedSlots.length === 0) {
+                container.innerHTML = `<div class="col-span-full text-center p-12 opacity-50">Select date and time slots...</div>`;
+                return;
+            }
+
+            // 1. Fetch all labs and all bookings for that date
+            const [{ data: labs }, { data: allBookings }] = await Promise.all([
+                supabaseClient.from('labs').select('*').order('name'),
+                supabaseClient.from('bookings').select('lab_id, time_slot').eq('booking_date', date).neq('status', 'rejected')
+            ]);
+
+            let html = "";
+            
+            labs.forEach(lab => {
+                // Check if the lab is booked in ANY of the selected slots
+                const conflictingBookings = allBookings.filter(b => 
+                    b.lab_id === lab.id && selectedSlots.includes(b.time_slot)
+                );
+
+                const isUnavailable = conflictingBookings.length > 0;
+
+                html += `
+                    <div class="card !mb-0 flex flex-col justify-between transition-all ${isUnavailable ? 'opacity-50 grayscale' : 'border-l-4 border-l-blue-600 shadow-sm'}">
+                        <div class="mb-4">
+                            <span class="text-[10px] font-bold ${isUnavailable ? 'text-red-500' : 'text-green-600'} uppercase">
+                                ${isUnavailable ? '● Conflicts Found' : '● Fully Available'}
+                            </span>
+                            <h3 class="font-bold text-lg text-slate-800 mt-1">${lab.name}</h3>
+                            <p class="text-xs text-slate-500">${selectedSlots.length} slot(s) selected</p>
+                        </div>
+                        ${isUnavailable ? 
+                            `<button class="btn bg-slate-100 text-slate-400 cursor-not-allowed w-full" disabled>Not Available</button>` : 
+                            `<button onclick="confirmMultiBooking('${lab.id}', '${lab.name}')" class="btn btn-primary w-full">Book All Slots</button>`
+                        }
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        async function confirmMultiBooking(labId, labName) {
+            const user = JSON.parse(localStorage.getItem('currentUser'));
+            const date = document.getElementById('booking-date').value;
+            
+            // Sort slots to keep them in order
+            const sortedSlots = [...selectedSlots].sort();
+            
+            if(!confirm(`Book ${labName} for ${sortedSlots.length} slots on ${date}?`)) return;
+
+            // Create a booking record for EACH selected slot
+            const bookingsToInsert = sortedSlots.map(slot => ({
+                lab_id: labId,
+                booking_date: date,
+                time_slot: slot,
+                user_name: user.name,
+                status: 'pending',
+                purpose: "Multi-slot Booking"
+            }));
+
+            const { error } = await supabaseClient.from('bookings').insert(bookingsToInsert);
+            
+            if (!error) {
+                alert("Booking requests submitted!");
+                refreshBookingView();
+            } else {
+                alert("Error submitting booking.");
+            }
+        }
+
+        /*
+        // Logic to find which labs are NOT booked for the specific time
+        async function fetchAvailableLabs() {
+            const date = document.getElementById('booking-date').value;
+            const slot = document.getElementById('time-slot-select').value;
+            const container = document.getElementById('available-labs-container');
+
+            if (!date || !slot) return;
+
+            container.innerHTML = `<div class="col-span-full text-center p-12">Checking availability...</div>`;
+
+            // 1. Fetch all labs
+            const { data: labs } = await supabaseClient.from('labs').select('*').order('name');
+            
+            // 2. Fetch existing bookings for this specific date and time
+            const { data: booked } = await supabaseClient.from('bookings')
+                .select('lab_id')
+                .eq('booking_date', date)
+                .eq('time_slot', slot)
+                .neq('status', 'rejected');
+
+            const bookedIds = booked ? booked.map(b => b.lab_id) : [];
+
+            // 3. Render as Cards
+            let html = "";
+            labs.forEach(lab => {
+                const isBooked = bookedIds.includes(lab.id);
+                
+                html += `
+                    <div class="card !mb-0 flex flex-col justify-between transition-all ${isBooked ? 'opacity-50 grayscale' : 'border-l-4 border-l-blue-600 shadow-sm'}">
+                        <div class="mb-4">
+                            <span class="text-[10px] font-bold ${isBooked ? 'text-red-500' : 'text-green-600'} uppercase">
+                                ${isBooked ? '● Occupied' : '● Available'}
+                            </span>
+                            <h3 class="font-bold text-lg text-slate-800 mt-1">${lab.name}</h3>
+                        </div>
+                        ${isBooked ? 
+                            `<button class="btn bg-slate-100 text-slate-400 cursor-not-allowed w-full" disabled>Fully Booked</button>` : 
+                            `<button onclick="openModal('${lab.id}', '${lab.name}', '${slot}')" class="btn btn-primary w-full">Request This Slot</button>`
+                        }
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html || `<div class="col-span-full text-center p-12">No labs found in system.</div>`;
+        }
+
+        
         async function populateLabFilter() {
+            // Fetch labs and populate the filter dropdown
             const { data } = await supabaseClient.from('labs').select('id, name').order('name');
             const sel = document.getElementById('lab-filter');
             data?.forEach(l => sel.innerHTML += `<option value="${l.id}">${l.name}</option>`);
         }
 
         async function fetchAvailability() {
+            // Fetch labs and bookings for the selected date, then build the availability grid
             const date = document.getElementById('booking-date').value;
             const labId = document.getElementById('lab-filter').value;
             if(!date) return alert('Please select a date');
@@ -147,6 +332,7 @@
             });
             document.getElementById('grid-container').innerHTML = html + `</tbody></table>`;
         }
+        */
 
         function openModal(id, name, slot) {
             document.getElementById('modal-lab-id').value = id;
@@ -155,7 +341,7 @@
         }
 
         function closeModal() { document.getElementById('booking-modal').classList.add('hidden-ui'); }
-
+                    
         async function submitBooking() {
             const user = JSON.parse(localStorage.getItem('currentUser'));
             await supabaseClient.from('bookings').insert([{
