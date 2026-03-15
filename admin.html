@@ -97,10 +97,10 @@
         async function fetchLabs() {
             const { data } = await supabaseClient.from('labs').select('*').order('name');
             const pSel = document.getElementById('filter-p-lab'), aSel = document.getElementById('filter-a-lab');
-            pSel.innerHTML = aSel.innerHTML = '<option value="all">All Labs</option>';
-            document.getElementById('l-list').innerHTML = data.map(l => {
+            pSel.setHTML = aSel.setHTML = '<option value="all">All Labs</option>';
+            document.getElementById('l-list').setHTML = data.map(l => {
                 const opt = `<option value="${l.name}">${l.name}</option>`;
-                pSel.innerHTML += opt; aSel.innerHTML += opt;
+                pSel.setHTML += opt; aSel.setHTML += opt;
                 return `<tr><td data-label="Lab">${l.name}</td><td class="text-right"><button onclick="delLab('${l.id}')" class="text-red-500 font-bold">Delete</button></td></tr>`;
             }).join('');
         }
@@ -118,7 +118,7 @@
             const p = bookingsCache.filter(b => b.status === 'pending' && (!pD || b.booking_date === pD) && (pL === 'all' || b.labs?.name === pL));
             const h = bookingsCache.filter(b => b.status !== 'pending' && (!aD || b.booking_date === aD) && (aL === 'all' || b.labs?.name === aL));
 
-            document.getElementById('pending-list').innerHTML = p.map(b => `
+            document.getElementById('pending-list').setHTML = p.map(b => `
                 <tr>
                     <td data-label="Details"><b>${b.booking_date}</b><br><small class="text-blue-600 font-bold">${b.labs?.name} | ${b.time_slot}</small></td>
                     <td data-label="User">${b.user_name}</td>
@@ -130,7 +130,7 @@
                 </tr>
             `).join('') || '<tr><td colspan="4" class="text-center p-8 opacity-50">Empty</td></tr>';
 
-            document.getElementById('history-list').innerHTML = h.map(b => `
+            document.getElementById('history-list').setHTML = h.map(b => `
                 <tr>
                     <td data-label="Details">${b.booking_date}<br><small>${b.labs?.name}</small></td>
                     <td data-label="User">${b.user_name}</td>
@@ -144,7 +144,7 @@
         
         async function fetchUsers() {
             const { data } = await supabaseClient.from('users').select('*').order('name');
-            document.getElementById('u-list').innerHTML = data.map(u => `<tr><td data-label="Name">${u.name} ${u.is_admin ? '⭐' : ''}</td><td data-label="Email">${u.email}</td><td data-label="Action" class="text-right"><button onclick="delUser('${u.id}')" class="text-red-500">Remove</button></td></tr>`).join('');
+            document.getElementById('u-list').setHTML = data.map(u => `<tr><td data-label="Name">${u.name} ${u.is_admin ? '⭐' : ''}</td><td data-label="Email">${u.email}</td><td data-label="Action" class="text-right"><button onclick="delUser('${u.id}')" class="text-red-500">Remove</button></td></tr>`).join('');
         }
 
         async function addUser() {
